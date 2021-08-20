@@ -4,80 +4,94 @@
 import * as React from 'react'
 import {
   fetchPokemon,
-  PokemonForm,
   PokemonDataView,
-  PokemonInfoFallback,
   PokemonErrorBoundary,
+  PokemonForm,
+  PokemonInfoFallback
 } from '../pokemon'
 
-// 🐨 this is going to be our generic asyncReducer
-function pokemonInfoReducer(state, action) {
+function asyncReducer(state, action) {
   switch (action.type) {
     case 'pending': {
-      // 🐨 replace "pokemon" with "data"
-      return {status: 'pending', pokemon: null, error: null}
+      return {status: 'pending', data: null, error: null}
     }
     case 'resolved': {
-      // 🐨 replace "pokemon" with "data" (in the action too!)
-      return {status: 'resolved', pokemon: action.pokemon, error: null}
+      return {status: 'resolved', data: action.data, error: null}
     }
     case 'rejected': {
-      // 🐨 replace "pokemon" with "data"
-      return {status: 'rejected', pokemon: null, error: action.error}
+      return {status: 'rejected', data: null, error: action.error}
     }
     default: {
       throw new Error(`Unhandled action type: ${action.type}`)
     }
   }
 }
-
-function PokemonInfo({pokemonName}) {
-  // 🐨 move both the useReducer and useEffect hooks to a custom hook called useAsync
-  // here's how you use it:
-  // const state = useAsync(
-  //   () => {
-  //     if (!pokemonName) {
-  //       return
-  //     }
-  //     return fetchPokemon(pokemonName)
-  //   },
-  //   {status: pokemonName ? 'pending' : 'idle'},
-  //   [pokemonName],
-  // )
-  // 🐨 so your job is to create a useAsync function that makes this work.
-  const [state, dispatch] = React.useReducer(pokemonInfoReducer, {
-    status: pokemonName ? 'pending' : 'idle',
+function useAsync(status) {
+  const [state, dispatch] = React.useReducer(asyncReducer, {
+    ...status,
     // 🐨 this will need to be "data" instead of "pokemon"
-    pokemon: null,
+    data: null,
     error: null,
   })
 
-  React.useEffect(() => {
-    // 💰 this first early-exit bit is a little tricky, so let me give you a hint:
-    // const promise = asyncCallback()
-    // if (!promise) {
-    //   return
-    // }
-    // then you can dispatch and handle the promise etc...
-    if (!pokemonName) {
+  const callback = promise => {
+    if (!promise) {
       return
     }
     dispatch({type: 'pending'})
-    fetchPokemon(pokemonName).then(
-      pokemon => {
-        dispatch({type: 'resolved', pokemon})
-      },
-      error => {
-        dispatch({type: 'rejected', error})
-      },
+    promise.then(
+      data => dispatch({type: 'resolved', data}),
+      error => dispatch({type: 'rejected', error}),
     )
-    // 🐨 you'll accept dependencies as an array and pass that here.
-    // 🐨 because of limitations with ESLint, you'll need to ignore
-    // the react-hooks/exhaustive-deps rule. We'll fix this in an extra credit.
-  }, [pokemonName])
+  }
+  const runFn = React.useCallback(callback => {
+    if (!callback) return
+    callback
+      .then(data => {
+        console.log(data)
+        dispatch({type: 'resolved', data})
+      })
+      .catch(error => {
+        console.error(error)
+        dispatch({type: 'rejected', error})
+      })
+  }, [])
+  const runFn2 = React.useCallback(callback, [])
 
-  // 🐨 this will change from "pokemon" to "data"
-  const {pokemon, status, error} = state
+  // React.useEffect(() => {
+  //   const promise = runFn()
+  //   if (!promise) {
+  //     return
+  //   }
+  //   dispatch({type: 'pending'})
+  //   promise.then(
+  //     data => {
+  //       dispatch({type: 'resolved', data})
+  //     },
+  //     error => {
+  //       dispatch({type: 'rejected', error})
+  //     },
+  //   )
+  // }, [runFn])
+  return {...state, runFn: runFn2}
+}
+
+function PokemonInfo({pokemonName}) {
+  // const callback = React.useCallback(() => {
+  //   if (!pokemonName) {
+  //     return
+  //   }
+  //   return fetchPokemon(pokemonName)
+  // }, [pokemonName])
+  const {data, status, error, runFn} = useAsync({
+    status: pokemonName ? 'pending' : 'idle',
+  })
+  React.useEffect(() => {
+    if (!pokemonName) {
+      return
+    }
+    runFn(fetchPokemon(pokemonName))
+  }, [pokemonName, runFn])
 
   if (status === 'idle' || !pokemonName) {
     return 'Submit a pokemon'
@@ -86,7 +100,7 @@ function PokemonInfo({pokemonName}) {
   } else if (status === 'rejected') {
     throw error
   } else if (status === 'resolved') {
-    return <PokemonDataView pokemon={pokemon} />
+    return <PokemonDataView pokemon={data} />
   }
 
   throw new Error('This should be impossible')
