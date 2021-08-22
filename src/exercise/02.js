@@ -10,6 +10,21 @@ import {
   PokemonInfoFallback
 } from '../pokemon'
 
+function useSafeDispatch(dispatch) {
+  const mountedRef = React.useRef(false)
+  
+  React.useLayoutEffect(() => {
+    mountedRef.current = true
+    return () => mountedRef.current = false
+  }, [])
+
+  return React.useCallback((...args) => {
+    if (mountedRef.current) {
+      dispatch(...args)
+    }
+    }, [dispatch])
+}
+
 function asyncReducer(state, action) {
   switch (action.type) {
     case 'pending': {
@@ -26,13 +41,20 @@ function asyncReducer(state, action) {
     }
   }
 }
+
 function useAsync(status) {
-  const [state, dispatch] = React.useReducer(asyncReducer, {
+  const [state, unsafeDispatch] = React.useReducer(asyncReducer, {
     ...status,
     // 🐨 this will need to be "data" instead of "pokemon"
     data: null,
     error: null,
   })
+  
+
+  // const dispatch = React.useCallback((...args) => {
+  //   if(mountedRef.current) unsafeDispatch(...args)
+  // }, [])
+  const dispatch = useSafeDispatch(unsafeDispatch)
 
   const callback = promise => {
     if (!promise) {
