@@ -6,8 +6,11 @@ import * as React from 'react'
 function MessagesDisplay({messages}) {
   const containerRef = React.useRef()
   // 🐨 replace useEffect with useLayoutEffect
-  React.useEffect(() => {
-    containerRef.current.scrollTop = containerRef.current.scrollHeight
+  React.useLayoutEffect(() => {
+    console.log('top', containerRef.current.scrollTop)
+    const scrollHeight = containerRef.current.scrollHeight
+    console.log({scrollHeight})
+    containerRef.current.scrollTop = scrollHeight
   })
 
   return (
@@ -33,7 +36,7 @@ function SlooooowSibling() {
   // how it impacts interactivity of the page before updates.
   React.useEffect(() => {
     // increase this number to see a more stark difference
-    sleep(300)
+    sleep(5000)
   })
   return null
 }
